@@ -4,14 +4,13 @@
 - [x] : Text classification with accelerate
 - [ ] : Text classification using suicao's solution 
 - [ ] : Token classification
-- [ ] : QA
 - [ ] : Question Answering
 - [ ] : Text generate 
 - [ ] : Language Modeling
 
 ## Text classification with trainer hugginggface 
 ```
-    python run_glue.py \
+    python text_classication_run_trainer.py \
     --model_name_or_path xlm-roberta-large \
     --dataset_name truongpdd/KDD22task2Full  \
     --do_train \
