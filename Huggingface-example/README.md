@@ -12,7 +12,7 @@
 ```
     python text_classication_run_trainer.py \
     --model_name_or_path xlm-roberta-large \
-    --dataset_name truongpdd/KDD22task2Full  \
+    --dataset_name your_dataset  \
     --do_train \
     --do_eval \
     --max_seq_length 256 \
@@ -35,7 +35,7 @@ We concatenated the last 4 hidden representations of the [CLS] token on top and 
 ```
     python text_classification_suicao_solution.py \
     --model_name_or_path xlm-roberta-large \
-    --dataset_name truongpdd/KDD22task2Full  \
+    --dataset_name your_dataset  \
     --do_train \
     --do_eval \
     --max_seq_length 256 \
