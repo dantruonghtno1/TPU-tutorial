@@ -26,6 +26,13 @@ from transformers import (
     BertPreTrainedModel, 
     AutoModel
 )
+from typing import List, Optional, Tuple, Union
+from packaging import version
+from torch import nn
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+import torch 
+from transformers.modeling_outputs import SequenceClassifierOutput
+from transformers import BertPreTrainedModel, BertModel, AutoConfig, AutoTokenizer
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
@@ -76,18 +83,87 @@ class ModelArguments:
         default=None, metadata={"help": "model load from hf hub for your local"}
     )
 
-class SuicaoModel(BertPreTrainedModel):
+
+class ModifyModel(BertPreTrainedModel):
     def __init__(self, config):
-        super(SuicaoModel, self).__init__(config)
-        self.model = AutoModel.from_config(config=config)
-        self.num_labels = config.num_labels 
-        self.outputs_final = nn.Linear(4*config.hidden_size, self.num_labels)
-        
-    def forward(self, batch):
-        outputs = self.model(**(input),return_dict = False, output_hidden_states = True)
-        cls_output = torch.cat((outputs[2][-1][:,0, ...],outputs[2][-2][:,0, ...], outputs[2][-3][:,0, ...], outputs[2][-4][:,0, ...]),-1)
-        logits = self.outputs_final(cls_output)
-        return logits
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.config = config
+        self.bert = BertModel(config)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.classifier = nn.Linear(4*config.hidden_size, config.num_labels)
+        # Initialize weights and apply final processing
+        self.post_init()
+    def forward(
+        self,
+        input_ids: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        token_type_ids: Optional[torch.Tensor] = None,
+        position_ids: Optional[torch.Tensor] = None,
+        head_mask: Optional[torch.Tensor] = None,
+        inputs_embeds: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
+        r"""
+            apply suicao method to modify the model: 
+            1. concat last 4 cls token 
+            2. dropout
+            3. linear layer : 4*hidden_size -> num_labels
+
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.bert(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=True,
+            return_dict=return_dict,
+        )
+        pooled_output = outputs[1]
+        hidden_states = outputs[2]
+        cls_tokens = torch.cat((outputs[2][-1][:,0, ...],outputs[2][-2][:,0, ...], outputs[2][-3][:,0, ...], outputs[2][-4][:,0, ...]),-1)
+        pooled_output = self.dropout(cls_tokens)
+        logits = self.classifier(cls_tokens)
+        loss = None
+        if labels is not None:
+            if self.config.problem_type is None:
+                if self.num_labels == 1:
+                    self.config.problem_type = "regression"
+                elif self.num_labels > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
+                    self.config.problem_type = "single_label_classification"
+                else:
+                    self.config.problem_type = "multi_label_classification"
+            if self.config.problem_type == "regression":
+                loss_fct = MSELoss()
+                if self.num_labels == 1:
+                    loss = loss_fct(logits.squeeze(), labels.squeeze())
+                else:
+                    loss = loss_fct(logits, labels)
+            elif self.config.problem_type == "single_label_classification":
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+            elif self.config.problem_type == "multi_label_classification":
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else output
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
 
 def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
@@ -154,7 +230,7 @@ def main():
         model_args.model_name_or_path,
         use_fast=True,
     )
-    model = SuicaoModel.from_pretrained(
+    model = ModifyModel.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
