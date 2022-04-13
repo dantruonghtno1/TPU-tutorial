@@ -83,7 +83,8 @@ class ModelArguments:
         default=None, metadata={"help": "model load from hf hub for your local"}
     )
 
-
+# Ref: https://github.com/huggingface/transformers/issues/1827 
+# and: https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py#L1378
 class ModifyModel(BertPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
