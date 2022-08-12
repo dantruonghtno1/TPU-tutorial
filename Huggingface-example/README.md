@@ -22,7 +22,7 @@
     --save_total_limit  2 \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
-    --output_dir $(pwd)/output \ 
+    --output_dir $(pwd)/output \
     --report_to "wandb"
 ```
 
@@ -45,7 +45,7 @@ We concatenated the last 4 hidden representations of the [CLS] token on top and 
     --save_total_limit  2 \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
-    --output_dir $(pwd)/output \ 
+    --output_dir $(pwd)/output \
     --report_to "wandb"
 ```
 
@@ -63,7 +63,7 @@ We concatenated the last 4 hidden representations of the [CLS] token on top and 
     --save_total_limit  2 \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
-    --output_dir $(pwd)/output \ 
+    --output_dir $(pwd)/output \
     --report_to "wandb"
 ```
 
